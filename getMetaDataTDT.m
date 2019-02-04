@@ -3,27 +3,18 @@ function sMetaData = getMetaDataTDT(sMetaData)
 	%	sMetaData = getMetaDataTDT(sMetaData)
 	%
 	%If used in a batch file you must initialize these values:
-	%input: EVENT.Mytank = 'the tank you want to read from';
-	%       EVENT.Myblock = 'the block you want to read from';
+	%input: sMetaData.Mytank = 'the tank you want to read from';
+	%       sMetaData.Myblock = 'the block you want to read from';
 	%
-	%output: EVENT ;  a structure containing a lot of info
-	%        Stmlist ; an array containing timing info about all the trials
-	%             1st column contains stimulus onset times
-	%             2nd contains trial onset times, when the monkey starts to fixate
-	%             3rd saccade onset times
-	%             4th target onset times
-	%             5th correct(1) or not correct(0)
-	%             6th error (1) or no error(0)
-	%             7th micro stim times
-	%             8th 15 bit word value (0 - 2^15) for conditional stimulus data
+	%output: sMetaData ;  a structure containing a lot of info
+	%        sMetaData.Trials ; a structure containing trial timing and info
 	%
-	% Chris van der Togt, 29/05/2006
-	%
-	% 2007-04-17 Uses GetEpocsV to retrieve stobe-on epocs [by CvdT]
-	% 2019-02-01 Cleaned up a bit and added error-checking [by Jorrit Montijn]
 	%Version History:
 	%2019-02-01 Created metadata retrieval function, based on Chris van der
-	%			Togt's Exinf() function. Changes are mostly cosmetic [by Jorrit Montijn]   
+	%			Togt's Exinf() function. Changes are mostly cosmetic,
+	%			except for several error checks and optimizations 
+	%				[by Jorrit Montijn]
+	%2019-02-04 Finished rebuilding, and added to github repository [by JM]
 	
 	%% define event codes
 	sEventCode.UNKNOWN = hex2dec('0');  %"Unknown"; UNUSED

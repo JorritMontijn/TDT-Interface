@@ -74,8 +74,9 @@ function sMetaData = getMetaDataTDT(sMetaData)
 			%readEventsV() must be usef first to sets the read pointer to
 			%the requested stream, otherwise ParseEvV() will return the
 			%previous stream's data instead. 1000 requests the first 1000
-			%events, which are sequentially ordered by channel. intReadInitialEventNum = 1000;
-			intEventNum = ptrLib.ReadEventsV(1000, strStreamName, 0, 0, 0, 0, 'ALL'); %read in number of events
+			%events, which are sequentially ordered by channel. 
+			intReadInitialEventNum = 1000;
+			intEventNum = ptrLib.ReadEventsV(intReadInitialEventNum, strStreamName, 0, 0, 0, 0, 'ALL'); %read in number of events
 			%In order to extract the number of channels, we can then look at the
 			%maximum value contained in the returned 1000-event long epoch.
 			intNumChans = max(ptrLib.ParseEvInfoV(0, intEventNum, sInfoCodes.CHAN));

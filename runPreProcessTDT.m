@@ -3,7 +3,7 @@
 %% define which recording to process
 strMouse = 'Roku';
 strDate = '20180514';
-strBlock = '3';
+strBlock = '5';
 intRefType = 2;
 strDataRoot = 'D:\Data\Raw\ePhys';
 
@@ -84,6 +84,12 @@ activate phy
 phy template-gui params.py
 exit
 %}
+%% load stimulus logging file
+strPathLogs = strcat(strDataRoot,filesep,'StimLogs');
+sFiles = dir([strPathLogs filesep strDate '*B*' strBlock '*' strMouse '*.mat']);
+if numel(sFiles) == 1
+	sLog = load(sFiles(1).name);
+end
 
 %% load clustered data into matlab using https://github.com/cortex-lab/spikes
 %% load some of the useful pieces of information from the kilosort and manual sorting results into a struct

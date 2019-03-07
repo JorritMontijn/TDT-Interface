@@ -33,7 +33,12 @@ function [intCount,strTargetFile] = getBinKilofileFromTDT(strMouse, strDate, str
 	strSourceDir = 'D:\Data\Raw\ePhys\DataTanksTDT\';
 	strTargetDir = 'D:\Data\Raw\ePhys\KiloSortBinaries\';
 	strRec = [strMouse, '_', Tank.Date,'_B', Tank.Blockno];
-	strTargetFile = [strTargetDir, strRec,filesep,strRec,'_','all.bin'];
+	strSubDir = [strTargetDir, strRec,filesep];
+	if ~exist(strSubDir,'dir')
+		fprintf('Creating new path: "%s"\n',strSubDir);
+		mkdir(strSubDir);
+	end
+	strTargetFile = [strSubDir,strRec,'_','all.bin'];
 	
 	%% check if target file exists
 	if exist(strTargetFile,'file')

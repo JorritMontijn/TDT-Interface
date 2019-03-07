@@ -1,9 +1,9 @@
 % default options are in parenthesis after the comment
 
 %% define which recording to process
-strMouse = 'Roku';
-strDate = '20180514';
-strBlock = '5';
+strMouse = 'MB3';
+strDate = '20190221';
+strBlock = '2';
 intRefType = 2;
 strDataRoot = 'D:\Data\Raw\ePhys';
 
@@ -52,10 +52,10 @@ rez                = fullMPMU(rez, DATA);% extract final spike times (overlappin
 %     rez = merge_posthoc2(rez);
 
 % save matlab results file
-save(fullfile(ops.root,  'rez.mat'), 'rez', '-v7.3');
+save(fullfile([ops.root filesep ops.rec],  'rez.mat'), 'rez', '-v7.3');
 
 % save python results file for Phy
-rezToPhy(rez, ops.root);
+rezToPhy(rez, [ops.root filesep ops.rec]);
 
 % remove temporary file
 delete(ops.fproc);

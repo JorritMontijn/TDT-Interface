@@ -1,6 +1,6 @@
-function [vecTimestamps,matData] = getRawDataTDT(sMetaData,vecTimeRange)
+function [vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData,vecTimeRange)
 	%getRawDataTDT Extracts raw data from TDT data tank
-	%	[vecTimestamps,matData] = getRawDataTDT(sMetaData,vecTimeRange)
+	%	[vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData,vecTimeRange)
 	%
 	%Input 1 (sMetaData) can be retrieved with getMetaDataTDT(); it also
 	%			requires two fields you can change yourself:
@@ -15,6 +15,7 @@ function [vecTimestamps,matData] = getRawDataTDT(sMetaData,vecTimeRange)
 	%Output 1 (vecTimeStamps) supplies the sample-time per data point in
 	%			the raw data matrix (output 2)
 	%Output 2 (matData) contains data in a [channel x time-point] format (int16)
+	%Output 3 (vecChannels) contains channel indices
 	%
 	%Data can be accessed wrt trials using sMetaData.Trials
 	%
@@ -130,9 +131,10 @@ function [vecTimestamps,matData] = getRawDataTDT(sMetaData,vecTimeRange)
 			indThisEventBins = vecEvStartSecs==dblStartSecs;
 			matThisData = matEvData(:,indThisEventBins);
 			vecThisChanIdx = vecChanIdx(indThisEventBins);
+			indUseChans = ismember(vecThisChanIdx,vecChannels);
 			
 			%select channels
-			matThisData = matThisData(:,ismember(vecThisChanIdx,vecChannels));
+			matThisData = matThisData(:,vecThisChanIdx(indUseChans));
 			
 			%get timestamps
 			intThisBinNum = size(matThisData,1);

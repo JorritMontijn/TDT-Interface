@@ -1,4 +1,4 @@
-function [vecStimOnTime,matWord] = checkTriggersTDT(vecStimOnTime,matWord)
+function [vecStimOnTime,matWord] = checkTriggersTDT(vecStimOnTime,matWord,sStimLogData)
 	%checkTriggersTDT Removes double trigger events based on shortest ITI
 	%   Syntax:  [vecStimOnTime,matWord] = checkTriggersTDT(vecStimOnTime,matWord)
 	%

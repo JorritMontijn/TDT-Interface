@@ -131,10 +131,11 @@ function [vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData,vecTimeRa
 			indThisEventBins = vecEvStartSecs==dblStartSecs;
 			matThisData = matEvData(:,indThisEventBins);
 			vecThisChanIdx = vecChanIdx(indThisEventBins);
-			indUseChans = ismember(vecThisChanIdx,vecChannels);
+			indRetrieveChans = ismember(vecThisChanIdx,vecChannels);
+			indAssignChans = ismember(vecChannels,vecThisChanIdx);
 			
 			%select channels
-			matThisData = matThisData(:,vecThisChanIdx(indUseChans));
+			matThisData(:,vecChannels(indAssignChans)) = matThisData(:,vecThisChanIdx(indRetrieveChans));
 			
 			%get timestamps
 			intThisBinNum = size(matThisData,1);

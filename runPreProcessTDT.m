@@ -1,12 +1,18 @@
 % default options are in parenthesis after the comment
 
 %% define which recording to process
-strMouse = 'MB3';
-strDate = '20190221';
-strBlock = '2';
-intRefType = 2;
-strDataRoot = 'D:\Data\Raw\ePhys';
+strMouse = 'MB2';
+strDate = '20190315';
+vecOriginalOrdering = [2 1 18 17 6 5 8 7 10 9 12 11 14 13 16 15 4 3 20 19 ...
+	22 21 24 23 26 25 28 27 30 29 32 31];
+[vecSorted,vecReorder] = sort(vecOriginalOrdering,'ascend');
 
+%intBlock = 1;
+for intBlock = [1:7 9:12]
+strBlock = num2str(intBlock);
+intRefType = 1;
+strDataRoot = 'D:\Data\Raw\ePhys';
+strStimLog = [strDataRoot filesep 'StimLogs' filesep strMouse '_' strDate];
 %% set paths
 addpath(genpath('C:\Code\Acquisition\KiloSort')) % path to kilosort folder
 addpath(genpath('C:\Code\Acquisition\npy-matlab')) % path to npy-matlab scripts
@@ -15,18 +21,32 @@ addpath(genpath('C:\Code\Acquisition\npy-matlab')) % path to npy-matlab scripts
 ops.root = [strDataRoot filesep 'KiloSortBinaries']; % 'openEphys' only: where raw files are
 ops.rec  = [strMouse '_' strDate '_B' strBlock]; %which recording to process
 
+%% load stim logs
+sStimLogs = dir([strStimLog filesep '*_B' strBlock '_*.mat']);
+strLogFile = sStimLogs(1).name;
+sStimLogData = load([strStimLog filesep strLogFile]);
+
 %% get meta data from TDT data tank
 sMetaData = struct;
 sMetaData.Mytank = [strDataRoot filesep 'DataTanksTDT' filesep strMouse '_' strDate];
 sMetaData.Myblock = ['Block-' strBlock];
 sMetaData = getMetaDataTDT(sMetaData);
+
 vecStimOnTime = sMetaData.Trials.stim_onset;
 matWord = sMetaData.Trials.word;
-[vecStimOnTime,matWord] = checkTriggersTDT(vecStimOnTime,matWord);
+[vecStimOnTime,matWord] = checkTriggersTDT(vecStimOnTime,matWord,sStimLogData);
 vecStimType = matWord(:,2);
 
+% get raw data
+%[vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData);
+
 %% transform TDT files to KiloSort binaries
-[intCount,strTargetFile] = getBinKilofileFromTDT(strMouse, strDate, strBlock, intRefType);
+sMetaData.CHAN = vecReorder;
+[intCountWrite,strTargetFile] = getBinKilofileFromTDT(strMouse, strDate, strBlock, intRefType, sMetaData);
+intChannels = numel(vecChannels);
+
+%load binary file
+%[matDataBin,intCountRead] = loadEphysBinary(strTargetFile,intChannels);
 
 %% read config file for KiloSort
 pathToYourConfigFile = 'C:\Code\Acquisition\TDT-Interface'; % take from Github folder and put it somewhere else (together with the master_file)
@@ -59,6 +79,7 @@ rezToPhy(rez, [ops.root filesep ops.rec]);
 
 % remove temporary file
 delete(ops.fproc);
+end
 end
 % end processing, but we still want the interpreter to recognize the
 % commands below, so we'll use a stupid work-around

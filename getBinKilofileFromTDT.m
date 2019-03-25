@@ -1,4 +1,4 @@
-function [intCount,strTargetFile] = getBinKilofileFromTDT(strMouse, strDate, strBlock, intRefType, vecUseOddReferences, vecUseEvenReferences)
+function [intCount,strTargetFile,vecChannels] = getBinKilofileFromTDT(strMouse, strDate, strBlock, intRefType, sMetaData, vecUseOddReferences, vecUseEvenReferences)
 	%getBinKilofileFromTDT Transforms TDT raw data to KiloSort binary files
 	%	[intCount,strTargetFile] = getBinKilofileFromTDT(strMouse, strDate, strBlock, intRefType, vecUseOddReferences, vecUseEvenReferences)
 	%
@@ -8,6 +8,7 @@ function [intCount,strTargetFile] = getBinKilofileFromTDT(strMouse, strDate, str
 	%	- strBlock (string/numeric), block of experiment (e.g., '1')
 	%	- intRefType (integer), 0=no re-referencing, 1=avg per odd/even
 	%			channels, 2=use a subset of channels for re-referencing
+	%	- [sMetaData] (structure), Optional
 	%	- [vecUseOddReferences] (vector), Optional (Default: [29 31])
 	%	- [vecUseEvenReferences] (vector), Optional (Default: [30 32])
 	%Note that manual reference-channels are only used if intRefType==2
@@ -21,6 +22,7 @@ function [intCount,strTargetFile] = getBinKilofileFromTDT(strMouse, strDate, str
 	%			extraction functions. This function requires a
 	%			pre-installed KiloSort toolbox.
 	%				[by Jorrit Montijn]
+	%2019-03-22 Added sMetaData as input [by JM]
 	
 	
 	%% get paths and locations
@@ -48,18 +50,26 @@ function [intCount,strTargetFile] = getBinKilofileFromTDT(strMouse, strDate, str
 	end
 	
 	%% Define which data to use
-	sMetaData = struct;
-	sMetaData.Mytank = strcat(strSourceDir,strMouse,'_',strDate);
-	sMetaData.Myblock = strcat('Block-',strBlock);
+	if ~exist('sMetaData','var')
+		sMetaData = struct;
+	end
+	if ~isfield(sMetaData,'Mytank')
+		sMetaData.Mytank = strcat(strSourceDir,strMouse,'_',strDate);
+	end
+	if ~isfield(sMetaData,'Myblock')
+		sMetaData.Myblock = strcat('Block-',strBlock);
+	end
+	if ~isfield(sMetaData,'CHAN')
+		sMetaData.CHAN = 1:32;
+	end
 	
 	%% open library
 	fprintf('Loading meta-data for %s of tank "%s" [%s]\n',sMetaData.Myblock,sMetaData.Mytank,getTime);
 	sMetaData = getMetaDataTDT(sMetaData);
-	
 	%% Get data from Tank into MATLAB
-	fprintf('Found %d channels; Recording length is %.3fs; retrieving raw data... [%s]\n',sMetaData.strms(1).channels(1),range(sMetaData.strms(1).timerange),getTime);
-	[vecTimestamps,matData] = getRawDataTDT(sMetaData);
-	fprintf('Raw data retrieved; re-referencing now (type %d)... [%s]\n',intRefType,getTime);
+	fprintf('Found %d channels; Recording length is %.3fs; retrieving channels [%s\b] [%s]\n',sMetaData.strms(1).channels(1),range(sMetaData.strms(1).timerange),sprintf('%d ',sMetaData.CHAN),getTime);
+	[vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData);
+	fprintf('Re-referencing now (type %d) on channels [%s\b]... [%s]\n',intRefType,sprintf('%d ',vecChannels),getTime);
 	
 	%Clean raw data, there is a 1-sample mismatch in top 2 channels
 	for intCh = 31:32
@@ -87,11 +97,18 @@ function [intCount,strTargetFile] = getBinKilofileFromTDT(strMouse, strDate, str
 			%re-reference odd by last two odd and even by last two even channels
 			matData(1:2:end,:) = bsxfun(@minus,matData(1:2:end,:),cast(mean(matData(vecUseOddReferences,:),1),'like',matData)); %odd
 			matData(2:2:end,:) = bsxfun(@minus,matData(2:2:end,:),cast(mean(matData(vecUseEvenReferences,:),1),'like',matData)); %even
+		case 3
+			%re-reference odd by median of all odd channels, and even by even
+			matData(1:2:end,:) = bsxfun(@minus,matData(1:2:end,:),cast(median(matData(1:2:end,:),1),'like',matData)); %odd
+			matData(2:2:end,:) = bsxfun(@minus,matData(2:2:end,:),cast(median(matData(2:2:end,:),1),'like',matData)); %even
+		case 4
+			%re-reference all by average
+			matData = bsxfun(@minus,matData,cast(mean(matData,1),'like',matData)); %odd
 	end
 	
 	%% write data to binary file
 	ptrFile = fopen(strTargetFile,'a');
-	fprintf('Pre-procssing complete. Writing data to binary file "%s"... [%s]\n',strTargetFile,getTime);
+	fprintf('Pre-processing complete. Writing data to binary file "%s"... [%s]\n',strTargetFile,getTime);
 	intCount = fwrite(ptrFile, matData,'int16');
 	fclose(ptrFile);
 	fprintf('Done! Output is %d [%s]\n',intCount,getTime);

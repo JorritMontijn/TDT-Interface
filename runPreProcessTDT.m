@@ -39,11 +39,11 @@ vecStimType = matWord(:,2);
 
 % get raw data
 %[vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData);
+%intChannels = numel(vecChannels);
 
 %% transform TDT files to KiloSort binaries
 sMetaData.CHAN = vecReorder;
 [intCountWrite,strTargetFile] = getBinKilofileFromTDT(strMouse, strDate, strBlock, intRefType, sMetaData);
-intChannels = numel(vecChannels);
 
 %load binary file
 %[matDataBin,intCountRead] = loadEphysBinary(strTargetFile,intChannels);

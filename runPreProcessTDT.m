@@ -9,6 +9,7 @@ vecOriginalOrdering = [2 1 18 17 6 5 8 7 10 9 12 11 14 13 16 15 4 3 20 19 ...
 
 %intBlock = 1;
 for intBlock = [1:7 9:12]
+%%
 strBlock = num2str(intBlock);
 intRefType = 1;
 strDataRoot = 'D:\Data\Raw\ePhys';
@@ -105,15 +106,40 @@ activate phy
 phy template-gui params.py
 exit
 %}
-%% load stimulus logging file
+
+%% set recording
+intBlock = 4;
+strBlock = num2str(intBlock);
+strDataRoot = 'D:\Data\Raw\ePhys';
+strStimLog = [strDataRoot filesep 'StimLogs' filesep strMouse '_' strDate];
+
+% set paths
+ops.root = [strDataRoot filesep 'KiloSortBinaries']; % 'openEphys' only: where raw files are
+ops.rec  = [strMouse '_' strDate '_B' strBlock]; %which recording to process
+
+%% load stimulus info
+%load logging file
 strPathLogs = strcat(strDataRoot,filesep,'StimLogs');
-sFiles = dir([strPathLogs filesep strDate '*B*' strBlock '*' strMouse '*.mat']);
+strSubDir = [strPathLogs filesep strMouse '_' strDate filesep];
+sFiles = dir([strSubDir strDate '*B*' strBlock '*.mat']);
 if numel(sFiles) == 1
-	sLog = load(sFiles(1).name);
+	sLog = load([strSubDir sFiles(1).name]);
 end
+structEP = sLog.structEP;
+
+%load triggers
+sMetaData = struct;
+sMetaData.Mytank = [strDataRoot filesep 'DataTanksTDT' filesep strMouse '_' strDate];
+sMetaData.Myblock = ['Block-' strBlock];
+sMetaData = getMetaDataTDT(sMetaData);
+
+vecStimOnTime = sMetaData.Trials.stim_onset;
+matWord = sMetaData.Trials.word;
+[vecStimOnTime,matWord] = checkTriggersTDT(vecStimOnTime,matWord,sStimLogData);
+vecStimType = matWord(:,2);
 
 %% load clustered data into matlab using https://github.com/cortex-lab/spikes
-%% load some of the useful pieces of information from the kilosort and manual sorting results into a struct
+% load some of the useful pieces of information from the kilosort and manual sorting results into a struct
 strLoadDir = [ops.root filesep ops.rec];
 sSpikes = loadKSdir(strLoadDir);
 

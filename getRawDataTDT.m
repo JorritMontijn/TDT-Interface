@@ -1,6 +1,6 @@
-function [vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData,vecTimeRange)
+function [vecTimestamps,matData,vecChannels,vecTimeRange] = getRawDataTDT(sMetaData,vecTimeRange)
 	%getRawDataTDT Extracts raw data from TDT data tank
-	%	[vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData,vecTimeRange)
+	%	[vecTimestamps,matData,vecChannels,vecTimeRange] = getRawDataTDT(sMetaData,vecTimeRange)
 	%
 	%Input 1 (sMetaData) can be retrieved with getMetaDataTDT(); it also
 	%			requires two fields you can change yourself:
@@ -16,6 +16,7 @@ function [vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData,vecTimeRa
 	%			the raw data matrix (output 2)
 	%Output 2 (matData) contains data in a [channel x time-point] format (int16)
 	%Output 3 (vecChannels) contains channel indices
+	%Output 4 (vecTimeRange) contains actual retrieved timerange
 	%
 	%Data can be accessed wrt trials using sMetaData.Trials
 	%
@@ -62,8 +63,12 @@ function [vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData,vecTimeRa
 	intNumChans = sMetaData.strms(intEvType).channels; %channels in block
 	dblApproxEventNumPerSec = intNumChans*dblSampFreq/intEventLength; %#ok<NASGU> %more event epochs than needed
 	%retrieve time range of entire stream if none is supplied
+	vecValidRange = ptrLib.GetValidTimeRangesV();
 	if ~exist('vecTimeRange','var') || isempty(vecTimeRange)
-		vecTimeRange = sMetaData.strms(intEvType).timerange; %start and stop time of recording
+		vecTimeRange = vecValidRange; %start and stop time of recording
+	end
+	if vecTimeRange(end) > vecValidRange(end)
+		vecTimeRange(end) = vecValidRange(end);
 	end
 	
 	%check channels
@@ -135,10 +140,11 @@ function [vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData,vecTimeRa
 			indAssignChans = ismember(vecChannels,vecThisChanIdx);
 			
 			%select channels
-			matThisData(:,vecChannels(indAssignChans)) = matThisData(:,vecThisChanIdx(indRetrieveChans));
+			clear matAssignData;
+			matAssignData(:,vecChannels(indAssignChans)) = matThisData(:,vecThisChanIdx(indRetrieveChans)); %#ok<AGROW>
 			
 			%get timestamps
-			intThisBinNum = size(matThisData,1);
+			intThisBinNum = size(matAssignData,1);
 			vecAssignBins = (intTimeBin + (1:intThisBinNum));
 			intTimeBin = intTimeBin + intThisBinNum;
 			vecTimestamps(vecAssignBins) = vecEventTimestamps+dblStartSecs;
@@ -149,7 +155,7 @@ function [vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData,vecTimeRa
 			end
 			
 			%assign to aggregate matrix
-			matData(:,vecAssignBins) = matThisData';
+			matData(:,vecAssignBins) = matAssignData';
 		end
 	end
 	

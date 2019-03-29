@@ -1,6 +1,6 @@
-function [vecStimOnTime,matWord] = checkTriggersTDT(vecStimOnTime,matWord,sStimLogData)
+function [vecStimTime,matWord] = checkTriggersTDT(vecStimTime,matWord,sStimLogData)
 	%checkTriggersTDT Removes double trigger events based on shortest ITI
-	%   Syntax:  [vecStimOnTime,matWord] = checkTriggersTDT(vecStimOnTime,matWord)
+	%   Syntax:  [vecStimTime,matWord] = checkTriggersTDT(vecStimTime,matWord)
 	%
 	%WARNING: THIS FUNCTION IS NOT FOOL-PROOF
 	%
@@ -13,16 +13,16 @@ function [vecStimOnTime,matWord] = checkTriggersTDT(vecStimOnTime,matWord,sStimL
 	%2019-02-08 Created trigger-fixer function. Use with caution.
 	%				[by Jorrit Montijn]
 	
-	if vecStimOnTime > size(matWord,1)
+	if vecStimTime > size(matWord,1)
 		%check for double stim on
-		vecStimDiff = diff(vecStimOnTime);
+		vecStimDiff = diff(vecStimTime);
 		%assume shortest ITI was incorrect
 		[dummy,intRemIdx]=min(vecStimDiff);
 		%remove double trigger
-		vecStimOnTime(intRemIdx+1) = [];
+		vecStimTime(intRemIdx+1) = [];
 		%send msg
-		warning([mfilename ':DoubleStimOn'],'More stim on than word events detected!');
-	elseif vecStimOnTime > size(matWord,1)
+		warning([mfilename ':DoubleStimOn'],'More stim than word events detected!');
+	elseif vecStimTime < size(matWord,1)
 		%check for double word
 		vecWordDiff=diff(matWord(:,1));
 		%assume shortest ITI was incorrect
@@ -30,7 +30,7 @@ function [vecStimOnTime,matWord] = checkTriggersTDT(vecStimOnTime,matWord,sStimL
 		%remove double trigger
 		matWord(intRemIdx+1,:) = [];
 		%send msg
-		warning([mfilename ':DoubleWord'],'More word than stim on events detected!');
+		warning([mfilename ':DoubleWord'],'More word than stim events detected!');
 	else
 		%we don't have to do anything
 	end

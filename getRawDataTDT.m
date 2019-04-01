@@ -138,10 +138,16 @@ function [vecTimestamps,matData,vecChannels,vecTimeRange] = getRawDataTDT(sMetaD
 			vecThisChanIdx = vecChanIdx(indThisEventBins);
 			indRetrieveChans = ismember(vecThisChanIdx,vecChannels);
 			indAssignChans = ismember(vecChannels,vecThisChanIdx);
+			vecRetrieve = vecThisChanIdx(indRetrieveChans);
+			vecAssign = vecChannels(indAssignChans);
 			
 			%select channels
-			clear matAssignData;
-			matAssignData(:,vecChannels(indAssignChans)) = matThisData(:,vecThisChanIdx(indRetrieveChans)); %#ok<AGROW>
+			matAssignData = nan([size(matThisData,1) intChannelNum]);
+			for intChIdx=1:intChannelNum
+				intRetrieveFrom = vecRetrieve(intChIdx);
+				indAssignTo = vecAssign==intRetrieveFrom;
+				matAssignData(:,indAssignTo) = matThisData(:,intRetrieveFrom);
+			end
 			
 			%get timestamps
 			intThisBinNum = size(matAssignData,1);

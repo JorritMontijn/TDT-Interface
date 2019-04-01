@@ -108,7 +108,9 @@ exit
 %}
 
 %% set recording
-intBlock = 4;
+strMouse = 'MB2';
+strDate = '20190315';
+intBlock = 3;
 strBlock = num2str(intBlock);
 strDataRoot = 'D:\Data\Raw\ePhys';
 strStimLog = [strDataRoot filesep 'StimLogs' filesep strMouse '_' strDate];
@@ -135,7 +137,7 @@ sMetaData = getMetaDataTDT(sMetaData);
 
 vecStimOnTime = sMetaData.Trials.stim_onset;
 matWord = sMetaData.Trials.word;
-[vecStimOnTime,matWord] = checkTriggersTDT(vecStimOnTime,matWord,sStimLogData);
+[vecStimOnTime,matWord] = checkTriggersTDT(vecStimOnTime,matWord,structEP);
 vecStimType = matWord(:,2);
 
 %% load clustered data into matlab using https://github.com/cortex-lab/spikes

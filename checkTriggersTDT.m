@@ -13,7 +13,7 @@ function [vecStimTime,matWord] = checkTriggersTDT(vecStimTime,matWord,sStimLogDa
 	%2019-02-08 Created trigger-fixer function. Use with caution.
 	%				[by Jorrit Montijn]
 	
-	if vecStimTime > size(matWord,1)
+	if numel(vecStimTime) > size(matWord,1)
 		%check for double stim on
 		vecStimDiff = diff(vecStimTime);
 		%assume shortest ITI was incorrect
@@ -22,7 +22,7 @@ function [vecStimTime,matWord] = checkTriggersTDT(vecStimTime,matWord,sStimLogDa
 		vecStimTime(intRemIdx+1) = [];
 		%send msg
 		warning([mfilename ':DoubleStimOn'],'More stim than word events detected!');
-	elseif vecStimTime < size(matWord,1)
+	elseif numel(vecStimTime) < size(matWord,1)
 		%check for double word
 		vecWordDiff=diff(matWord(:,1));
 		%assume shortest ITI was incorrect

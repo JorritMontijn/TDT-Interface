@@ -2,13 +2,16 @@
 
 %% define which recording to process
 strMouse = 'MB2';
-strDate = '20190315';
+strDate = '20190314';
 vecOriginalOrdering = [2 1 18 17 6 5 8 7 10 9 12 11 14 13 16 15 4 3 20 19 ...
 	22 21 24 23 26 25 28 27 30 29 32 31];
 [vecSorted,vecReorder] = sort(vecOriginalOrdering,'ascend');
+vecReorder=1:32;
+vecTimeRange = [0 inf];
 
+%%
 %intBlock = 1;
-for intBlock = [1:7 9:12]
+for intBlock = [2]
 %%
 strBlock = num2str(intBlock);
 intRefType = 1;
@@ -26,6 +29,9 @@ ops.rec  = [strMouse '_' strDate '_B' strBlock]; %which recording to process
 sStimLogs = dir([strStimLog filesep '*_B' strBlock '_*.mat']);
 strLogFile = sStimLogs(1).name;
 sStimLogData = load([strStimLog filesep strLogFile]);
+vecTrialStimTypes = sStimLogData.structEP.ActStimType;
+vecUniqueStims = unique(vecTrialStimTypes);
+intStimTypes = numel(vecUniqueStims);
 
 %% get meta data from TDT data tank
 sMetaData = struct;
@@ -36,7 +42,18 @@ sMetaData = getMetaDataTDT(sMetaData);
 vecStimOnTime = sMetaData.Trials.stim_onset;
 matWord = sMetaData.Trials.word;
 [vecStimOnTime,matWord] = checkTriggersTDT(vecStimOnTime,matWord,sStimLogData);
-vecStimType = matWord(:,2);
+vecStimTypeTDT = matWord(:,2);
+
+%% check to remove second half of recording
+if strcmpi(strDate,'20190314') && strcmpi(strMouse,'MB2') && intBlock == 2
+	vecTimeRange = sMetaData.strms(1).timerange;
+	dblCutOffTDT = (vecTimeRange(2) - vecTimeRange(1))/2;
+	dblCutOffStim = (vecStimOnTime(end) - vecStimOnTime(1))/2;
+	dblCutOff = max([dblCutOffTDT dblCutOffStim]);
+	intKeepTrials = ceil(sum(vecStimOnTime < dblCutOff)/intStimTypes)*intStimTypes;
+	dblCutOffTime = vecStimOnTime(intKeepTrials+1) - 0.5;
+	vecTimeRange = [0 dblCutOffTime];
+end
 
 % get raw data
 %[vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData);
@@ -44,7 +61,7 @@ vecStimType = matWord(:,2);
 
 %% transform TDT files to KiloSort binaries
 sMetaData.CHAN = vecReorder;
-[intCountWrite,strTargetFile] = getBinKilofileFromTDT(strMouse, strDate, strBlock, intRefType, sMetaData);
+[intCountWrite,strTargetFile] = getBinKilofileFromTDT(strMouse, strDate, strBlock, intRefType, sMetaData, [], [], vecTimeRange);
 
 %load binary file
 %[matDataBin,intCountRead] = loadEphysBinary(strTargetFile,intChannels);
@@ -123,7 +140,7 @@ ops.rec  = [strMouse '_' strDate '_B' strBlock]; %which recording to process
 %load logging file
 strPathLogs = strcat(strDataRoot,filesep,'StimLogs');
 strSubDir = [strPathLogs filesep strMouse '_' strDate filesep];
-sFiles = dir([strSubDir strDate '*B*' strBlock '*.mat']);
+sFiles = dir([strSubDir strDate '*_B' strBlock '_*.mat']);
 if numel(sFiles) == 1
 	sLog = load([strSubDir sFiles(1).name]);
 end

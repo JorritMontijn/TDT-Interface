@@ -1,6 +1,6 @@
-function [intCount,strTargetFile,vecChannels] = getBinKilofileFromTDT(strMouse, strDate, strBlock, intRefType, sMetaData, vecUseOddReferences, vecUseEvenReferences)
+function [intCount,strTargetFile,vecChannels] = getBinKilofileFromTDT(strMouse, strDate, strBlock, intRefType, sMetaData, vecUseOddReferences, vecUseEvenReferences, vecTimeRange)
 	%getBinKilofileFromTDT Transforms TDT raw data to KiloSort binary files
-	%	[intCount,strTargetFile] = getBinKilofileFromTDT(strMouse, strDate, strBlock, intRefType, vecUseOddReferences, vecUseEvenReferences)
+	%	[intCount,strTargetFile] = getBinKilofileFromTDT(strMouse, strDate, strBlock, intRefType, vecUseOddReferences, vecUseEvenReferences, vecTimeRange)
 	%
 	%inputs:
 	%	- strMouse (string), name of experimental animal (e.g., 'Mouse1')
@@ -11,6 +11,7 @@ function [intCount,strTargetFile,vecChannels] = getBinKilofileFromTDT(strMouse, 
 	%	- [sMetaData] (structure), Optional
 	%	- [vecUseOddReferences] (vector), Optional (Default: [29 31])
 	%	- [vecUseEvenReferences] (vector), Optional (Default: [30 32])
+	%	- [vecTimeRange] (vector), Optional (Default: [0 inf])
 	%Note that manual reference-channels are only used if intRefType==2
 	%
 	%output:
@@ -62,13 +63,16 @@ function [intCount,strTargetFile,vecChannels] = getBinKilofileFromTDT(strMouse, 
 	if ~isfield(sMetaData,'CHAN')
 		sMetaData.CHAN = 1:32;
 	end
+	if ~exist('vecTimeRange','var') || isempty(vecTimeRange)
+		vecTimeRange = [0 inf]; %start and stop time of recording
+	end
 	
 	%% open library
 	fprintf('Loading meta-data for %s of tank "%s" [%s]\n',sMetaData.Myblock,sMetaData.Mytank,getTime);
 	sMetaData = getMetaDataTDT(sMetaData);
 	%% Get data from Tank into MATLAB
-	fprintf('Found %d channels; Recording length is %.3fs; retrieving channels [%s\b] [%s]\n',sMetaData.strms(1).channels(1),range(sMetaData.strms(1).timerange),sprintf('%d ',sMetaData.CHAN),getTime);
-	[vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData);
+	fprintf('Found %d channels; Recording length is %.3fs; retrieving time-range [%.3fs - %.3fs] for channels [%s\b] [%s]\n',sMetaData.strms(1).channels(1),range(sMetaData.strms(1).timerange),vecTimeRange(1),vecTimeRange(end),sprintf('%d ',sMetaData.CHAN),getTime);
+	[vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData,vecTimeRange);
 	fprintf('Re-referencing now (type %d) on channels [%s\b]... [%s]\n',intRefType,sprintf('%d ',vecChannels),getTime);
 	
 	%Clean raw data, there is a 1-sample mismatch in top 2 channels

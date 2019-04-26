@@ -168,6 +168,8 @@ function sMetaData = getMetaDataTDT(sMetaData)
 	%% close libraries
 	ptrLib.CloseTank;
 	ptrLib.ReleaseServer;
+	release(ptrLib);
+	%delete(ptrLib);
 	close(ptrFig);
 	
 	%% retrieve trial-based timings

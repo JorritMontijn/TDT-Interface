@@ -178,5 +178,7 @@ function [vecTimestamps,matData,vecChannels,vecTimeRange] = getRawDataTDT(sMetaD
 	%% close libraries
 	ptrLib.CloseTank;
 	ptrLib.ReleaseServer;
+	release(ptrLib);
+	%delete(ptrLib);
 	close(ptrFig);
 

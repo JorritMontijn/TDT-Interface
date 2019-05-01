@@ -93,6 +93,8 @@ function sMetaData = getMetaDataTDT(sMetaData)
 			sMetaData.strms(intStreamType).timerange = ptrLib.GetValidTimeRangesV(); %start and stop time in seconds of stream
 		end
 	end
+	%assign time range
+	sMetaData.vecTimeRange = sMetaData.strms(end).timerange;
 	
 	%% get snip events; this part is (practically) unchanged from CvdT's version
 	vecLongEvCo = ptrLib.GetEventCodes(sEventCode.SNIP);

@@ -1,4 +1,4 @@
-function sMetaData = getMetaDataTDT(sMetaData)
+function sMetaData = getMetaDataTDT(sMetaData,intVerbose)
 	%getMetaDataTDT Extracts metadata from TDT data tank
 	%	sMetaData = getMetaDataTDT(sMetaData)
 	%
@@ -12,9 +12,15 @@ function sMetaData = getMetaDataTDT(sMetaData)
 	%Version History:
 	%2019-02-01 Created metadata retrieval function, based on Chris van der
 	%			Togt's Exinf() function. Changes are mostly cosmetic,
-	%			except for several error checks and optimizations 
+	%			except for several error checks and optimizations
 	%				[by Jorrit Montijn]
 	%2019-02-04 Finished rebuilding, and added to github repository [by JM]
+	%2019-05-01 Added support for SCALAR triggers [by JM]
+	
+	%% get verbosity
+	if ~exist('intVerbose','var') || isempty(intVerbose)
+		intVerbose = 1;
+	end
 	
 	%% define event codes
 	sEventCode.UNKNOWN = hex2dec('0');  %"Unknown"; UNUSED
@@ -65,7 +71,7 @@ function sMetaData = getMetaDataTDT(sMetaData)
 			%readEventsV() must be usef first to sets the read pointer to
 			%the requested stream, otherwise ParseEvV() will return the
 			%previous stream's data instead. 1000 requests the first 1000
-			%events, which are sequentially ordered by channel. 
+			%events, which are sequentially ordered by channel.
 			intReadInitialEventNum = 1000;
 			intEventNum = ptrLib.ReadEventsV(intReadInitialEventNum, strStreamName, 0, 0, 0, 0, 'ALL'); %read in number of events
 			%In order to extract the number of channels, we can then look at the
@@ -78,7 +84,7 @@ function sMetaData = getMetaDataTDT(sMetaData)
 			if intNumChans >= intEventNum
 				warning([mfilename ':ManyChannels'],...
 					sprintf(['Highest channel number (%d) is equal to or larger than the number of initial reads (%d)\n'...
-						'Please double check your data tank!'],intNumChans,intEventNum)); %#ok<SPWRN>
+					'Please double check your data tank!'],intNumChans,intEventNum)); %#ok<SPWRN>
 			end
 			
 			%read single block
@@ -142,7 +148,38 @@ function sMetaData = getMetaDataTDT(sMetaData)
 		end
 	end
 	
-	%% retrieve trigger data
+	%% retrieve trigger data, v2
+	vecLongTrigCo = ptrLib.GetEventCodes(sEventCode.SCALAR); %gets the long codes of event types
+	intTrigTypes = numel(vecLongTrigCo);
+	if isnan(vecLongTrigCo),intTrigTypes=0;end
+	cellTrigNames = cell(intTrigTypes,1);
+	for intTrigType = 1:intTrigTypes
+		%retrieve name for stream type
+		cellTrigNames{intTrigType} = ptrLib.CodeToString(vecLongTrigCo(intTrigType));
+	end
+	
+	%get trigger data
+	for intTriggerType = 1:length(cellTrigNames)
+		strTriggerName = char(cellTrigNames{intTriggerType});
+		intEventNum = ptrLib.ReadEventsV(100000, strTriggerName, 0, 0, 0, 0, 'ALL'); %read in number of events
+		vecTriggerTimes = ptrLib.ParseEvInfoV(0, intEventNum, sInfoCodes.TIME); %6 = the time stamp
+		
+		if isnan(vecTriggerTimes)
+			vecTriggerTimes = [];
+			if intVerbose
+				disp([ strTriggerName ' Event has been recorded, but no events were retrieved']);
+			end
+		end
+		
+		if strcmpi(strTriggerName, 'word')
+			vecTriggerValues = ptrLib.ParseEvInfoV(0, intEventNum, sInfoCodes.SCVAL); %6 = the time stamp
+			vecTriggerTimes(2,:) = vecTriggerValues;
+		end
+		sMetaData.strons.(strTriggerName) = vecTriggerTimes;
+		
+	end
+	
+	%% retrieve trigger data, v1
 	%get trigger names
 	cellTriggerNames = cell(1,8);
 	for intTriggerType=0:7
@@ -156,7 +193,9 @@ function sMetaData = getMetaDataTDT(sMetaData)
 		strTriggerName = char(cellTriggerNames{intTriggerType});
 		Temp = ptrLib.GetEpocsV( strTriggerName, 0, 0, 100000);
 		if isnan(Temp)
-			disp([ strTriggerName ' Event has been recorded, but cannot be retrieved']);
+			if intVerbose
+				disp([ strTriggerName ' Event has been recorded, but cannot be retrieved']);
+			end
 		else
 			vecTriggerSecs = Temp(2,:);
 			
@@ -175,12 +214,6 @@ function sMetaData = getMetaDataTDT(sMetaData)
 	close(ptrFig);
 	
 	%% retrieve trial-based timings
-	%pre-allocate
-	matWord = [];
-	vecStimOn = [];
-	vecTarget = [];
-	vecMicroStim = [];
-	
 	%retrieve
 	if isfield(sMetaData, 'strons')
 		cellFieldNames = fieldnames(sMetaData.strons);
@@ -190,17 +223,43 @@ function sMetaData = getMetaDataTDT(sMetaData)
 			
 			%check which type
 			if strcmpi(strTrigger,'word')
-				
 				[matWord, Idx] = sort(sMetaData.strons.(strTrigger)(1,:).');
 				matWord(:,2) = sMetaData.strons.(strTrigger)(2,Idx).';
-			elseif strcmpi(strTrigger,'stim')
+				%assign to output
+				sMetaData.Trials.word = matWord;
+				
+			elseif strcmpi(strTrigger,'stim') || strcmpi(strTrigger,'StOn')
 				vecStimOn = sort(sMetaData.strons.(strTrigger).');
+				%assign to output
+				sMetaData.Trials.stim_onset = vecStimOn;
+				
+			elseif strcmpi(strTrigger,'StOf')
+				vecStimOff = sort(sMetaData.strons.(strTrigger).');
+				%assign to output
+				sMetaData.Trials.stim_offset = vecStimOff;
+				
+			elseif strcmpi(strTrigger,'Tria')
+				vecTrial = sort(sMetaData.strons.(strTrigger).');
+				%assign to output
+				sMetaData.Trials.trial = vecTrial;
+				
+			elseif strcmpi(strTrigger,'Resp')
+				vecResponse = sort(sMetaData.strons.(strTrigger).');
+				
+				%assign to output
+				sMetaData.Trials.response = vecResponse;
 				
 			elseif strcmpi(strTrigger,'targ')
 				vecTarget = sort(sMetaData.strons.(strTrigger).');
 				
+				%assign to output
+				sMetaData.Trials.target_onset = vecTarget;
+				
 			elseif strcmpi(strTrigger,'micr')
 				vecMicroStim = sort(sMetaData.strons.(strTrigger).');
+				
+				%assign to output
+				sMetaData.Trials.micro_stim_time = vecMicroStim;
 				
 			end
 		end
@@ -208,18 +267,5 @@ function sMetaData = getMetaDataTDT(sMetaData)
 		%send warning
 		warning([mfilename ':NoTriggers'],'No triggers found!');
 	end
-	
-	%save trial list in Trial structure
-	sMetaData.Trials.stim_onset = vecStimOn;
-	if ~isempty(vecMicroStim)
-		sMetaData.Trials.micro_stim_time = vecMicroStim;
-	end
-	if ~isempty(vecTarget)
-		sMetaData.Trials.target_onset = vecTarget;
-	end
-	if ~isempty(matWord)
-		sMetaData.Trials.word = matWord;
-	end
-	
 end
 

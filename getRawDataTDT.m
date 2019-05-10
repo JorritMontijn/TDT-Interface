@@ -6,7 +6,7 @@ function [vecTimestamps,matData,vecChannels,vecTimeRange] = getRawDataTDT(sMetaD
 	%			requires two fields you can change yourself:
 	%			- sMetaData.CHAN: vector of channels to retrieve
 	%			- sMetaData.Myevent: string of which data type (e.g., dRAW)
-	%			
+	%
 	%Input 2 (vecTimeRange) is optional and specifies which time range you
 	%			wish to retrieve the data for: [start-time stop-time]
 	%			Note that this retrieval is border-inclusive (e.g., if
@@ -24,7 +24,8 @@ function [vecTimestamps,matData,vecChannels,vecTimeRange] = getRawDataTDT(sMetaD
 	%2019-02-01 Created TDT data retrieval function, based on Chris van der
 	%			Togt's Exd4() function. This function returns the full
 	%			continuous trace (or a subset specified by vecTimeRange)
-	%			rather than trial epochs like Exd4() [by Jorrit Montijn]    
+	%			rather than trial epochs like Exd4() [by Jorrit Montijn]
+	%2019-05-10 Added error check for on-the-fly reading [by JM]
 	
 	%% check for optional arguments
 	%#ok<*SPERR>
@@ -48,7 +49,7 @@ function [vecTimestamps,matData,vecChannels,vecTimeRange] = getRawDataTDT(sMetaD
 	if 0 == ptrLib.OpenTank(sMetaData.Mytank, 'R')
 		ptrLib.CloseTank;
 		ptrLib.ReleaseServer;
-		error([mfilename ':TankMissing'],sprintf('Data tank %s does not exist',sMetaData.Mytank)); 
+		error([mfilename ':TankMissing'],sprintf('Data tank %s does not exist',sMetaData.Mytank));
 	end
 	
 	%select block and create epochs
@@ -62,6 +63,7 @@ function [vecTimestamps,matData,vecChannels,vecTimeRange] = getRawDataTDT(sMetaD
 	vecEventTimestamps = (0:(intEventLength-1))./dblSampFreq;
 	intNumChans = sMetaData.strms(intEvType).channels; %channels in block
 	dblApproxEventNumPerSec = intNumChans*dblSampFreq/intEventLength; %#ok<NASGU> %more event epochs than needed
+	
 	%retrieve time range of entire stream if none is supplied
 	vecValidRange = ptrLib.GetValidTimeRangesV();
 	if ~exist('vecTimeRange','var') || isempty(vecTimeRange)
@@ -140,7 +142,9 @@ function [vecTimestamps,matData,vecChannels,vecTimeRange] = getRawDataTDT(sMetaD
 			indAssignChans = ismember(vecChannels,vecThisChanIdx);
 			vecRetrieve = vecThisChanIdx(indRetrieveChans);
 			vecAssign = vecChannels(indAssignChans);
-			
+			if max(vecRetrieve) > size(matThisData,2)
+				break;
+			end
 			%select channels
 			matAssignData = nan([size(matThisData,1) intChannelNum]);
 			for intChIdx=1:intChannelNum
@@ -154,7 +158,7 @@ function [vecTimestamps,matData,vecChannels,vecTimeRange] = getRawDataTDT(sMetaD
 			vecAssignBins = (intTimeBin + (1:intThisBinNum));
 			intTimeBin = intTimeBin + intThisBinNum;
 			vecTimestamps(vecAssignBins) = vecEventTimestamps+dblStartSecs;
-		
+			
 			%check if matrix is empty
 			if any(matData(1,vecAssignBins) ~=0)
 				error([mfilename ':AssignmentError'],'Timestamp error! Time bins are already filled in output data structure');
@@ -181,4 +185,4 @@ function [vecTimestamps,matData,vecChannels,vecTimeRange] = getRawDataTDT(sMetaD
 	release(ptrLib);
 	%delete(ptrLib);
 	close(ptrFig);
-
+	

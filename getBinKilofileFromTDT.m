@@ -5,13 +5,14 @@ function [intCount,strTargetFile,vecChannels] = getBinKilofileFromTDT(strMouse, 
 	%inputs:
 	%	- strMouse (string), name of experimental animal (e.g., 'Mouse1')
 	%	- strDate (string/numeric), date of experiment (e.g., '20190101')
-	%	- strBlock (string/numeric), block of experiment (e.g., '1')
+	%	- varBlock (string/numeric/cell), block of experiment (e.g., '1'),
+	%			if cell array, defines the blocks that should be concatenated
 	%	- intRefType (integer), 0=no re-referencing, 1=avg per odd/even
 	%			channels, 2=use a subset of channels for re-referencing
 	%	- [sMetaData] (structure), Optional
 	%	- [vecUseOddReferences] (vector), Optional (Default: [29 31])
 	%	- [vecUseEvenReferences] (vector), Optional (Default: [30 32])
-	%	- [vecTimeRange] (vector), Optional (Default: [0 inf])
+	%	- [vecTimeRange] (vector/cell), Optional (Default: [0 inf])
 	%Note that manual reference-channels are only used if intRefType==2
 	%
 	%output:
@@ -24,18 +25,27 @@ function [intCount,strTargetFile,vecChannels] = getBinKilofileFromTDT(strMouse, 
 	%			pre-installed KiloSort toolbox.
 	%				[by Jorrit Montijn]
 	%2019-03-22 Added sMetaData as input [by JM]
+	%2019-06-11 Added support for merging recordings [by JM]
 	
 	
 	%% get paths and locations
-	strBlock = num2str(strBlock);
-	strDate = num2str(strDate);
-	Tank.Name = strMouse;
-	Tank.Date = strDate;
-	Tank.Tankname = [Tank.Name '_' Tank.Date];
-	Tank.Blockno = strBlock;
+	if iscell(strBlock)
+		strNewBlockName = '';
+		for intBlockNr=1:numel(strBlock)
+			strThisBlock = num2str(strBlock{intBlockNr});
+			cellBlock{intBlockNr} = strThisBlock;
+			strNewBlockName = strcat(strNewBlockName,strThisBlock,'-');
+		end
+		strDate = num2str(strDate);
+		strRec = [strMouse, '_', strDate,'_B', strNewBlockName(1:(end-1))];
+	else
+		cellBlock = {num2str(strBlock)};
+		strDate = num2str(strDate);
+		strRec = [strMouse, '_', strDate,'_B', cellBlock{1}];
+	end
+	%set and create paths
 	strSourceDir = 'D:\Data\Raw\ePhys\DataTanksTDT\';
 	strTargetDir = 'D:\Data\Raw\ePhys\KiloSortBinaries\';
-	strRec = [strMouse, '_', Tank.Date,'_B', Tank.Blockno];
 	strSubDir = [strTargetDir, strRec,filesep];
 	if ~exist(strSubDir,'dir')
 		fprintf('Creating new path: "%s"\n',strSubDir);
@@ -57,59 +67,75 @@ function [intCount,strTargetFile,vecChannels] = getBinKilofileFromTDT(strMouse, 
 	if ~isfield(sMetaData,'Mytank')
 		sMetaData.Mytank = strcat(strSourceDir,strMouse,'_',strDate);
 	end
-	if ~isfield(sMetaData,'Myblock')
-		sMetaData.Myblock = strcat('Block-',strBlock);
-	end
 	if ~isfield(sMetaData,'CHAN')
 		sMetaData.CHAN = 1:32;
 	end
 	if ~exist('vecTimeRange','var') || isempty(vecTimeRange)
-		vecTimeRange = [0 inf]; %start and stop time of recording
+		cellTimeRange = cellfill([0 inf],size(cellBlock)); %start and stop time of recording
+	elseif iscell(vecTimeRange)
+		cellTimeRange = vecTimeRange;
+	elseif numel(vecTimeRange) == 2
+		cellTimeRange = {vecTimeRange};
 	end
 	
-	%% open library
-	fprintf('Loading meta-data for %s of tank "%s" [%s]\n',sMetaData.Myblock,sMetaData.Mytank,getTime);
-	sMetaData = getMetaDataTDT(sMetaData);
-	%% Get data from Tank into MATLAB
-	fprintf('Found %d channels; Recording length is %.3fs; retrieving time-range [%.3fs - %.3fs] for channels [%s\b] [%s]\n',sMetaData.strms(1).channels(1),range(sMetaData.strms(1).timerange),vecTimeRange(1),vecTimeRange(end),sprintf('%d ',sMetaData.CHAN),getTime);
-	[vecTimestamps,matData,vecChannels] = getRawDataTDT(sMetaData,vecTimeRange);
-	fprintf('Re-referencing now (type %d) on channels [%s\b]... [%s]\n',intRefType,sprintf('%d ',vecChannels),getTime);
-	
-	%Clean raw data, there is a 1-sample mismatch in top 2 channels
-	for intCh = 31:32
-		matData(intCh,:) = circshift(matData(intCh,:),[0 -1]);
-		matData(intCh,end) = matData(intCh,end-1);
+	%% go through blocks
+	matData = [];
+	for intBlockNr = 1:numel(cellBlock)
+		%% set block
+		sMetaData.Myblock = strcat('Block-',cellBlock{intBlockNr});
+		
+		%% get timerange
+		vecTimeRange = cellTimeRange{intBlockNr};
+		
+		%% open library
+		fprintf('Loading meta-data for %s of tank "%s" [%s]\n',sMetaData.Myblock,sMetaData.Mytank,getTime);
+		sMetaData = getMetaDataTDT(sMetaData);
+		%% Get data from Tank into MATLAB
+		intRawStream = find(ismember({sMetaData.strms(:).name},'dRAW'));
+		dblRawSampf = sMetaData.strms(intRawStream).sampf;
+		intRawChNr = sMetaData.strms(intRawStream).channels; %#ok<FNDSB>
+		fprintf('Found %d channels; Recording length is %.3fs; retrieving time-range [%.3fs - %.3fs] for channels [%s\b] [%s]\n',intRawChNr,range(sMetaData.strms(intRawStream).timerange),vecTimeRange(1),vecTimeRange(end),sprintf('%d ',sMetaData.CHAN),getTime);
+		[vecTimestamps,matBlockData,vecChannels] = getRawDataTDT(sMetaData,vecTimeRange);
+		fprintf('Re-referencing now (type %d) on channels [%s\b]... [%s]\n',intRefType,sprintf('%d ',vecChannels),getTime);
+		
+		%Clean raw data, there is a 1-sample mismatch in top 2 channels
+		for intCh = 31:32
+			matBlockData(intCh,:) = circshift(matBlockData(intCh,:),[0 -1]);
+			matBlockData(intCh,end) = matBlockData(intCh,end-1);
+		end
+		
+		%% check if reference channels are supplied
+		if ~exist('vecUseOddReferences','var') || isempty(vecUseOddReferences)
+			vecUseOddReferences = [29 31];
+		end
+		if ~exist('vecUseEvenReferences','var') || isempty(vecUseEvenReferences)
+			vecUseEvenReferences = [30 32];
+		end
+		
+		%% clean up raw data
+		% common average referencing
+		switch intRefType
+			case 1
+				%re-reference odd by average of all odd channels, and even by even
+				matBlockData(1:2:end,:) = bsxfun(@minus,matBlockData(1:2:end,:),cast(mean(matBlockData(1:2:end,:),1),'like',matBlockData)); %odd
+				matBlockData(2:2:end,:) = bsxfun(@minus,matBlockData(2:2:end,:),cast(mean(matBlockData(2:2:end,:),1),'like',matBlockData)); %even
+				
+			case 2
+				%re-reference odd by last two odd and even by last two even channels
+				matBlockData(1:2:end,:) = bsxfun(@minus,matBlockData(1:2:end,:),cast(mean(matBlockData(vecUseOddReferences,:),1),'like',matBlockData)); %odd
+				matBlockData(2:2:end,:) = bsxfun(@minus,matBlockData(2:2:end,:),cast(mean(matBlockData(vecUseEvenReferences,:),1),'like',matBlockData)); %even
+			case 3
+				%re-reference odd by median of all odd channels, and even by even
+				matBlockData(1:2:end,:) = bsxfun(@minus,matBlockData(1:2:end,:),cast(median(matBlockData(1:2:end,:),1),'like',matBlockData)); %odd
+				matBlockData(2:2:end,:) = bsxfun(@minus,matBlockData(2:2:end,:),cast(median(matBlockData(2:2:end,:),1),'like',matBlockData)); %even
+			case 4
+				%re-reference all by average
+				matBlockData = bsxfun(@minus,matBlockData,cast(mean(matBlockData,1),'like',matBlockData)); %odd
+		end
+		%% append data
+		matData = cat(2,matData,matBlockData);
+		fprintf('Finished %s; total data size is now %d timepoints (%.1fs)\n',sMetaData.Myblock,size(matData,2),size(matData,2)/dblRawSampf);
 	end
-	
-	%% check if reference channels are supplied
-	if ~exist('vecUseOddReferences','var') || isempty(vecUseOddReferences)
-		vecUseOddReferences = [29 31];
-	end
-	if ~exist('vecUseEvenReferences','var') || isempty(vecUseEvenReferences)
-		vecUseEvenReferences = [30 32];
-	end
-	
-	%% clean up raw data
-	% common average referencing
-	switch intRefType
-		case 1
-			%re-reference odd by average of all odd channels, and even by even
-			matData(1:2:end,:) = bsxfun(@minus,matData(1:2:end,:),cast(mean(matData(1:2:end,:),1),'like',matData)); %odd
-			matData(2:2:end,:) = bsxfun(@minus,matData(2:2:end,:),cast(mean(matData(2:2:end,:),1),'like',matData)); %even
-			
-		case 2
-			%re-reference odd by last two odd and even by last two even channels
-			matData(1:2:end,:) = bsxfun(@minus,matData(1:2:end,:),cast(mean(matData(vecUseOddReferences,:),1),'like',matData)); %odd
-			matData(2:2:end,:) = bsxfun(@minus,matData(2:2:end,:),cast(mean(matData(vecUseEvenReferences,:),1),'like',matData)); %even
-		case 3
-			%re-reference odd by median of all odd channels, and even by even
-			matData(1:2:end,:) = bsxfun(@minus,matData(1:2:end,:),cast(median(matData(1:2:end,:),1),'like',matData)); %odd
-			matData(2:2:end,:) = bsxfun(@minus,matData(2:2:end,:),cast(median(matData(2:2:end,:),1),'like',matData)); %even
-		case 4
-			%re-reference all by average
-			matData = bsxfun(@minus,matData,cast(mean(matData,1),'like',matData)); %odd
-	end
-	
 	%% write data to binary file
 	ptrFile = fopen(strTargetFile,'a');
 	fprintf('Pre-processing complete. Writing data to binary file "%s"... [%s]\n',strTargetFile,getTime);
